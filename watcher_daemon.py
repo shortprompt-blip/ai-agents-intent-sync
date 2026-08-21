@@ -1,36 +1,39 @@
+import asyncio
 import json
 import subprocess
 import time
-import urllib.request
-
-REGISTRY_URL = "http://localhost:8000/register"  # Endpoint di team condiviso
-DEV_ID = "dev_alpha"
+import websockets
+from discovery import find_or_become_leader
 
 def get_dirty_files():
-    """Rileva i file modificati localmente non ancora committati."""
     try:
         output = subprocess.check_output(["git", "status", "--porcelain"]).decode("utf-8")
         return [line.strip().split()[-1] for line in output.splitlines() if line]
     except Exception:
         return []
 
-def sync_local_state():
-    """Invia lo stato dei file dirty al registro di team ogni 5 secondi."""
-    while True:
-        dirty_files = get_dirty_files()
-        payload = json.dumps({
-            "dev_id": DEV_ID,
-            "dirty_files": dirty_files,
-            "timestamp": time.time()
-        }).encode("utf-8")
-        
-        req = urllib.request.Request(REGISTRY_URL, data=payload, headers={'Content-Type': 'application/json'})
-        try:
-            urllib.request.urlopen(req, timeout=2)
-        except Exception:
-            pass  # Fail silent se il registro non è momentaneamente raggiungibile
-        time.sleep(5)
+async def sync_loop(dev_id: str):
+    node_info = find_or_become_leader()
+    host = "127.0.0.1" if node_info["role"] == "leader" else node_info["host"]
+    uri = f"ws://{host}:8765"
 
-if __name__ == "__main__":
-    sync_local_state()
-  
+    while True:
+        try:
+            async with websockets.connect(uri) as ws:
+                while True:
+                    dirty_files = get_dirty_files()
+                    payload = {
+                        "type": "STATE_UPDATE",
+                        "dev_id": dev_id,
+                        "payload": {
+                            "dirty_files": dirty_files,
+                            "timestamp": time.time()
+                        }
+                    }
+                    await ws.send(json.dumps(payload))
+                    await asyncio.sleep(5)
+        except Exception:
+            await asyncio.sleep(3)  # Riprova la connessione se cade
+
+def start_watcher(dev_id: str):
+    asyncio.run(sync_loop(dev_id))
