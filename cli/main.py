@@ -2,6 +2,7 @@ import argparse
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 import sys
 import os
 import subprocess
@@ -9,7 +10,6 @@ import subprocess
 SERVER_URL = os.getenv("INTENT_SYNC_URL", "http://localhost:8000")
 
 def get_repo_id():
-    """Inferisce l'ID del repository dalla cartella corrente (nome folder o git remote)."""
     try:
         remote = subprocess.check_output(["git", "remote", "get-url", "origin"], stderr=subprocess.DEVNULL).decode().strip()
         return remote.split('/')[-1].replace('.git', '')
@@ -59,11 +59,12 @@ def cmd_acquire(args):
         sys.exit(1)
 
 def cmd_release(args):
-    res = make_request("DELETE", f"/v1/intents/{args.intent_id}")
+    query = urllib.parse.urlencode({"agent_id": args.agent})
+    res = make_request("DELETE", f"/v1/intents/{args.intent_id}?{query}")
     print(f"✅ Rilasciato con successo: {args.intent_id}")
 
 def cmd_renew(args):
-    payload = {"ttl": args.ttl}
+    payload = {"ttl": args.ttl, "agent_id": args.agent}
     res = make_request("POST", f"/v1/intents/{args.intent_id}/renew", payload)
     print(f"✅ Rinnovato. Nuova scadenza: {res['expires_at']}")
 
@@ -83,7 +84,7 @@ def cmd_doctor(args):
     print("🩺 Intent-Sync Doctor")
     print(f"Controllando il server su {SERVER_URL}...")
     try:
-        res = make_request("GET", "/v1/health")
+        make_request("GET", "/v1/health")
         print("✅ Server API raggiungibile.")
     except Exception:
         print("❌ Impossibile raggiungere il Server API.")
@@ -97,28 +98,30 @@ def main():
 
     # ACQUIRE
     p_acquire = subparsers.add_parser("acquire", help="Richiede una lease prima di modificare i file")
-    p_acquire.add_argument("--files", required=True, help="Lista di file separati da virgola (es. src/main.py,src/auth.py)")
+    p_acquire.add_argument("--files", required=True, help="Lista file separati da virgola")
     p_acquire.add_argument("--intent", required=True, help="Descrizione dell'operazione")
     p_acquire.add_argument("--op", default="modify", choices=['read', 'modify', 'refactor', 'delete', 'rename'], help="Tipo operazione")
-    p_acquire.add_argument("--agent", default=os.getenv("USER", "unknown_agent"), help="ID Agente (default: OS user)")
-    p_acquire.add_argument("--repo", help="ID repository (default: inferito dalla cartella git)")
-    p_acquire.add_argument("--ttl", type=int, default=900, help="Time to live in secondi")
+    p_acquire.add_argument("--agent", default=os.getenv("USER", "unknown_agent"), help="ID Agente")
+    p_acquire.add_argument("--repo", help="ID repository")
+    p_acquire.add_argument("--ttl", type=int, default=900, help="Time to live in sec")
     p_acquire.set_defaults(func=cmd_acquire)
 
     # RELEASE
     p_release = subparsers.add_parser("release", help="Rilascia una lease")
-    p_release.add_argument("intent_id", help="ID dell'intento da rilasciare")
+    p_release.add_argument("intent_id", help="ID dell'intento")
+    p_release.add_argument("--agent", default=os.getenv("USER", "unknown_agent"), help="ID Agente (deve essere l'owner)")
     p_release.set_defaults(func=cmd_release)
 
     # RENEW
     p_renew = subparsers.add_parser("renew", help="Rinnova il tempo di una lease")
     p_renew.add_argument("intent_id", help="ID dell'intento")
-    p_renew.add_argument("--ttl", type=int, default=900, help="Tempo aggiuntivo in secondi")
+    p_renew.add_argument("--ttl", type=int, default=900, help="Tempo aggiuntivo in sec")
+    p_renew.add_argument("--agent", default=os.getenv("USER", "unknown_agent"), help="ID Agente (deve essere l'owner)")
     p_renew.set_defaults(func=cmd_renew)
 
     # STATUS
-    p_status = subparsers.add_parser("status", help="Mostra le lease attive sul repository")
-    p_status.add_argument("--repo", help="ID repository (default: inferito)")
+    p_status = subparsers.add_parser("status", help="Mostra le lease attive")
+    p_status.add_argument("--repo", help="ID repository")
     p_status.set_defaults(func=cmd_status)
 
     # DOCTOR
@@ -130,4 +133,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-  
