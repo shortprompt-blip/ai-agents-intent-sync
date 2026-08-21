@@ -39,7 +39,7 @@ Agents never communicate with each other directly. They interact with a central 
                                                 +----------------+  +-------------+
                                                 | Conflict Matrix|  |  SQLite DB  |
                                                 +----------------+  +-------------+
-
+```
 
 ## 🚀 Quick Start
 
@@ -48,6 +48,7 @@ Run the FastAPI server locally or on a shared team machine:
 ```bash
 pip install -r requirements.txt
 python -m server.api
+```
 
 2. Agent Usage (CLI)
 Agents (or developers) interact with the server via the CLI tool:
@@ -72,6 +73,9 @@ Simply copy the provided skill to your local workspace to make Claude natively a
 mkdir -p .claude/skills/intent-guard
 cp SKILL.md .claude/skills/intent-guard/SKILL.md
 
+Related web tools: ShortPrompt
+
 📄 License
 MIT License.
+
 
