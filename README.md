@@ -73,7 +73,7 @@ Simply copy the provided skill to your local workspace to make Claude natively a
 mkdir -p .claude/skills/intent-guard
 cp SKILL.md .claude/skills/intent-guard/SKILL.md
 
-Related web tools: ShortPrompt
+Related web tools: [ShortPrompt](https://shortprompt.altervista.org/)
 
 📄 License
 MIT License.
