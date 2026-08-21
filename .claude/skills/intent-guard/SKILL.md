@@ -1,27 +1,25 @@
 ---
-name: intent-guard
-description: Prevents code collisions and AI overwrites by checking team intent and uncommitted local changes before modifying files.
+name: intent-sync
+description: Agent Coordination Protocol - Acquires a file lease before modifying code to prevent conflicts with other autonomous agents or developers.
 ---
 
-# AI Intent Guard
+# Intent Sync Coordination
 
-Use this skill BEFORE executing any file-modifying actions (`Write`, `Edit`, `Replace`, `Patch`) or making multi-file structural changes to ensure no teammates are currently editing the same modules.
+You are operating in a multi-agent environment. BEFORE executing any file-modifying actions (`Write`, `Edit`, `Replace`, `Patch`, `Delete`), you MUST acquire a lease from the coordination server.
 
-## When to Activate
+## Workflow
 
-* Automatically before modifying, refactoring, or creating any code file in the repository.
-* When executing multi-file refactoring tasks or complex feature updates.
+1. **Identify Target Files**: Determine exactly which files you need to modify.
+2. **Formulate Intent**: Create a concise, 1-sentence description of your task (e.g., "Refactor JWT auth middleware").
+3. **Acquire Lease**: Run the CLI tool to acquire the lock:
+   ```bash
+   python -m cli.main acquire --files "file1.py,file2.py" --intent "Description of task"
 
-## Execution Workflow
+ * Evaluate Response:
+   * If ALLOWED: Note the intent_id provided in the output. Proceed with your file modifications.
+   * If CONFLICT: Stop immediately. Read the CLI output to see which agent is working on the files. Ask the user how to proceed or wait.
+ * Release Lease: Once your code generation or refactoring is COMPLETE and saved (or committed), you MUST release the lock using the ID you received:
+   python -m cli.main release <intent_id>
 
-1. Identify the primary file path being targeted for changes.
-2. Formulate a 1-sentence summary of the intended code modification.
-3. Run the interceptor script via CLI before calling any file-writing tools:
-
-```bash
-python intent_interceptor.py --dev-id "$DEV_ID" --prompt "DESCRIPTION_OF_CHANGE" --target "PATH_TO_FILE"
-
-Response Handling
- * If Execution is ALLOWED: Proceed immediately with the code generation and file modifications.
- * If Execution is BLOCKED: Halt file-writing tools immediately. Inform the user that another teammate is currently working on the target file, display the conflicting developer's ID, and request manual confirmation before proceeding.
+Do not bypass this process. It guarantees codebase integrity.
 
