@@ -22,6 +22,25 @@ Before starting a task, an agent registers an *intent* (a lease):
 - **Universal CLI:** A dependency-free Python CLI used by agents to acquire/release leases.
 - **Agent Adapters:** Easy integration via custom instructions or skills (e.g., Claude Code `.claude/skills`).
 
+## 🏗️ Architecture & Protocol Flow
+
+Agents never communicate with each other directly. They interact with a central stateless CLI, which coordinates with the server API. The server leverages SQLite's transaction model (`BEGIN IMMEDIATE`) to guarantee mathematical atomicity for concurrent requests.
+
+### Component Architecture
+
+```text
++----------------+
+|  Claude Code   |---\
++----------------+    \     +-----------------+       +-------------------+
+                       |--> | Intent Sync CLI | ====> |  FastAPI Server   |
++----------------+    /     +-----------------+ HTTP  +-------------------+
+| Cursor / IDEs  |---/                             Auth    |             |
++----------------+                                         v             v
+                                                +----------------+  +-------------+
+                                                | Conflict Matrix|  |  SQLite DB  |
+                                                +----------------+  +-------------+
+
+
 ## 🚀 Quick Start
 
 ### 1. Start the Server
