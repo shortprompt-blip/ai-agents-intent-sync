@@ -1,0 +1,6 @@
+{
+  "dev_id": "dev_alpha",
+  "ws_port": 8765,
+  "discovery_port": 5007
+}
+
