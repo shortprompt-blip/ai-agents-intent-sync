@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Agent Coordination Protocol", version="2.0.0", lifespan=lifespan)
 
-# --- Modelli Pydantic per validazione input ---
+# --- Modelli Pydantic ---
 class AcquireRequest(BaseModel):
     repository_id: str
     agent_id: str
@@ -26,17 +26,16 @@ class AcquireRequest(BaseModel):
 
 class RenewRequest(BaseModel):
     ttl: int = 900
+    agent_id: str  # Aggiunto per verifica ownership
 
 # --- Endpoints ---
 
 @app.get("/v1/health")
 def health_check():
-    """Usato dalla CLI (doctor) per verificare se il server è attivo."""
     return {"status": "ok", "service": "intent-sync-server"}
 
 @app.post("/v1/intents")
 def api_acquire(req: AcquireRequest):
-    """L'agente richiede una lease per operare su un set di file."""
     result = acquire_lease(
         repository_id=req.repository_id,
         agent_id=req.agent_id,
@@ -49,26 +48,26 @@ def api_acquire(req: AcquireRequest):
 
 @app.post("/v1/intents/{intent_id}/renew")
 def api_renew(intent_id: str, req: RenewRequest):
-    """Rinnova il TTL di un intento attivo."""
-    result = renew_lease(intent_id, extra_ttl_seconds=req.ttl)
+    result = renew_lease(intent_id, agent_id=req.agent_id, extra_ttl_seconds=req.ttl)
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=result["error"])
     return result
 
 @app.delete("/v1/intents/{intent_id}")
-def api_release(intent_id: str):
-    """L'agente rilascia la lease dopo aver committato."""
-    success = release_lease(intent_id)
+def api_release(intent_id: str, agent_id: str):
+    """Richiede agent_id come query parameter (?agent_id=...) per validare l'ownership."""
+    success = release_lease(intent_id, agent_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Intent not found or already released/expired")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Intent not found, already released, or unauthorized (wrong agent_id)"
+        )
     return {"status": "released", "intent_id": intent_id}
 
 @app.get("/v1/intents")
 def api_list_intents(repository_id: str):
-    """Restituisce lo stato corrente del repo (utile per Dashboard e Debug)."""
     intents = get_active_intents(repository_id)
     return {"repository_id": repository_id, "active_intents": intents}
 
 if __name__ == "__main__":
     uvicorn.run("server.api:app", host="0.0.0.0", port=8000, reload=True)
-  
